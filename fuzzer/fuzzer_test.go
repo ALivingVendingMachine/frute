@@ -8,7 +8,7 @@ import (
 )
 
 func TestMutateString(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	tests := []struct {
 		inp   string
 		seed  int64
@@ -39,7 +39,7 @@ func TestMutateString(t *testing.T) {
 }
 
 func TestMutateStringASCII(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	tests := []struct {
 		inp   string
 		seed  int64
@@ -70,7 +70,7 @@ func TestMutateStringASCII(t *testing.T) {
 }
 
 func TestMutateStringErrors(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	_, err := f.MutateString("", 12345, 1)
 	if err == nil {
 		t.Errorf("expected error, got nothing")
@@ -88,7 +88,7 @@ func TestMutateStringErrors(t *testing.T) {
 }
 
 func TestMutateStringASCIIErrors(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 	_, err := f.MutateStringASCII("", 12345, 1)
 	if err == nil {
 		t.Errorf("expected error, got nothing")
@@ -106,6 +106,7 @@ func TestMutateStringASCIIErrors(t *testing.T) {
 }
 
 func TestRandomString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		length int
 		seed   int64
@@ -140,6 +141,7 @@ func TestRandomString(t *testing.T) {
 }
 
 func TestRandomStringErrors(t *testing.T) {
+	t.Parallel()
 	_, err := f.RandomString(0, 999, 1)
 	if err == nil {
 		t.Errorf("0: expected error, got nothing")
@@ -155,6 +157,7 @@ func TestRandomStringErrors(t *testing.T) {
 }
 
 func TestRandomStringASCII(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		length int
 		seed   int64
@@ -189,6 +192,7 @@ func TestRandomStringASCII(t *testing.T) {
 }
 
 func TestRandomStringASCIIErrors(t *testing.T) {
+	t.Parallel()
 	_, err := f.RandomStringASCII(0, 999, 1)
 	if err == nil {
 		t.Errorf("0: expected error, got nothing")
@@ -204,6 +208,7 @@ func TestRandomStringASCIIErrors(t *testing.T) {
 }
 
 func TestRandomInt(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		limit  int
 		seed   int64
@@ -226,6 +231,7 @@ func TestRandomInt(t *testing.T) {
 }
 
 func TestRandomIntErrors(t *testing.T) {
+	t.Parallel()
 	_, err := f.RandomInt(0, 0)
 	if err == nil {
 		t.Errorf("0: got nothing, expected error")
