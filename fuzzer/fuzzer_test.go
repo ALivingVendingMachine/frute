@@ -8,7 +8,7 @@ import (
 )
 
 func TestMutateString(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	tests := []struct {
 		inp   string
 		seed  int64
@@ -28,6 +28,7 @@ func TestMutateString(t *testing.T) {
 	}
 	for i, test := range tests {
 		this, err := f.MutateString(test.inp, test.seed, test.iters)
+		t.Logf("%q", this)
 		if err != nil {
 			t.Errorf("%d: error: %v", i, err)
 		}
@@ -38,7 +39,7 @@ func TestMutateString(t *testing.T) {
 }
 
 func TestMutateStringASCII(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	tests := []struct {
 		inp   string
 		seed  int64
@@ -58,6 +59,7 @@ func TestMutateStringASCII(t *testing.T) {
 	}
 	for i, test := range tests {
 		this, err := f.MutateStringASCII(test.inp, test.seed, test.iters)
+		t.Logf("%q", this)
 		if err != nil {
 			t.Errorf("%d: error: %v", i, err)
 		}
@@ -68,7 +70,7 @@ func TestMutateStringASCII(t *testing.T) {
 }
 
 func TestMutateStringErrors(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	_, err := f.MutateString("", 12345, 1)
 	if err == nil {
 		t.Errorf("expected error, got nothing")
@@ -86,7 +88,7 @@ func TestMutateStringErrors(t *testing.T) {
 }
 
 func TestMutateStringASCIIErrors(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 	_, err := f.MutateStringASCII("", 12345, 1)
 	if err == nil {
 		t.Errorf("expected error, got nothing")
@@ -124,6 +126,7 @@ func TestRandomString(t *testing.T) {
 
 	for i, test := range tests {
 		this, err := f.RandomString(test.length, test.seed, test.iters)
+		t.Logf("%q", this)
 		if err != nil {
 			t.Errorf("%d: error: %v", i, err)
 		}
@@ -172,6 +175,7 @@ func TestRandomStringASCII(t *testing.T) {
 
 	for i, test := range tests {
 		this, err := f.RandomStringASCII(test.length, test.seed, test.iters)
+		t.Logf("%q", this)
 		if err != nil {
 			t.Errorf("%d: error: %v", i, err)
 		}
@@ -211,6 +215,7 @@ func TestRandomInt(t *testing.T) {
 	}
 	for i, test := range tests {
 		this, err := f.RandomInt(test.limit, test.seed)
+		t.Logf("%q", this)
 		if err != nil {
 			t.Errorf("%d: error: %v", i, err)
 		}
