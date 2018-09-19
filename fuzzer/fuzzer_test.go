@@ -241,3 +241,69 @@ func TestRandomIntErrors(t *testing.T) {
 		t.Errorf("1: got nothing, expected error")
 	}
 }
+
+func TestMutateSelection(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input    string
+		sentinel string
+		seed     int64
+		iters    int
+		output   string
+	}{
+		{"hello !world!", "!", 1234, 1, "hello o⟭d"},
+		{"hello !!!world!!!", "!!!", 1234, 1, "hello o⟭d"},
+		{"hello !world!", "!", 1234, 3, "hello o⟭doldo갶d"},
+		{"hello !!!world!!!", "!!!", 1234, 3, "hello o⟭doldo갶d"},
+		{"hello !world!", "!", 1234, 5, "hello o⟭doldo갶d∻l푌ᢪ睁d"},
+		{"hello !!!!world!!!!", "!!!!", 1234, 5, "hello o⟭doldo갶d∻l푌ᢪ睁d"},
+		{"destroy!er!", "!", 9876543210, 1, "destroyr"},
+		{"destroy!!er!!", "!!", 9876543210, 1, "destroyr"},
+		{"destroy!!!er!!!", "!!!", 9876543210, 1, "destroyr"},
+		{"destroy!!!!er!!!!", "!!!!", 9876543210, 1, "destroyr"},
+		{"destroy!!!er!!!!", "!!!", 9876543210, 1, "destroyr!"},
+	}
+	for i, test := range tests {
+		out, err := f.MutateSelection(test.input, test.sentinel, test.seed, test.iters)
+		t.Logf("got %q", out)
+		if err != nil {
+			t.Errorf("error: %v", err)
+		}
+		if strings.Compare(test.output, out) != 0 {
+			t.Errorf("%d: got %q, expected %q", i, out, test.output)
+		}
+	}
+}
+
+func TestMutateSelectionASCII(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input    string
+		sentinel string
+		seed     int64
+		iters    int
+		output   string
+	}{
+		{"hello !world!", "!", 1234, 1, "hello omd"},
+		{"hello !!!world!!!", "!!!", 1234, 1, "hello omd"},
+		{"hello !world!", "!", 1234, 3, "hello omdoldo6d"},
+		{"hello !!!world!!!", "!!!", 1234, 3, "hello omdoldo6d"},
+		{"hello !world!", "!", 1234, 5, "hello omdoldo6d;lL*Ad"},
+		{"hello !!!!world!!!!", "!!!!", 1234, 5, "hello omdoldo6d;lL*Ad"},
+		{"destroy!er!", "!", 9876543210, 1, "destroyr"},
+		{"destroy!!er!!", "!!", 9876543210, 1, "destroyr"},
+		{"destroy!!!er!!!", "!!!", 9876543210, 1, "destroyr"},
+		{"destroy!!!!er!!!!", "!!!!", 9876543210, 1, "destroyr"},
+		{"destroy!!!er!!!!", "!!!", 9876543210, 1, "destroyr!"},
+	}
+	for i, test := range tests {
+		out, err := f.MutateSelectionASCII(test.input, test.sentinel, test.seed, test.iters)
+		t.Logf("got %q", out)
+		if err != nil {
+			t.Errorf("error: %v", err)
+		}
+		if strings.Compare(test.output, out) != 0 {
+			t.Errorf("%d: got %q, expected %q", i, out, test.output)
+		}
+	}
+}

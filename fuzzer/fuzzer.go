@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math/rand"
 	"strings"
+
+	r "github.com/alivingvendingmachine/frute/replacer"
 )
 
 // MutateString takes a string and a seed for a random number generator.  Then,
@@ -134,4 +136,52 @@ func RandomInt(limit int, seed int64) (int, error) {
 
 	r := rand.New(rand.NewSource(seed))
 	return r.Intn(limit), nil
+}
+
+// MutateSelection takes an input, sentinel (both strings), a seed (int64), and
+// a number of iterations.  It then mutates the string, and returns the input
+// with the selection (between sentinels) mutated.
+func MutateSelection(input string, sentinel string, seed int64, iters int) (string, error) {
+	start, stop, err := r.Search(input, sentinel)
+	if err != nil {
+		return "", err
+	}
+
+	fuzz := input[start+(len(sentinel)) : stop-(len(sentinel))]
+
+	fuzzed, err := MutateString(fuzz, seed, iters)
+	if err != nil {
+		return "", err
+	}
+
+	ret, err := r.Replace(input, fuzzed, sentinel)
+	if err != nil {
+		return "", err
+	}
+
+	return ret, nil
+}
+
+// MutateSelectionASCII takes an input, sentinel (both strings), a seed (int64), and
+// a number of iterations.  It then mutates the string, and returns the input
+// with the selection (between sentinels) mutated in the ASCII range.
+func MutateSelectionASCII(input string, sentinel string, seed int64, iters int) (string, error) {
+	start, stop, err := r.Search(input, sentinel)
+	if err != nil {
+		return "", err
+	}
+
+	fuzz := input[start+(len(sentinel)) : stop-(len(sentinel))]
+
+	fuzzed, err := MutateStringASCII(fuzz, seed, iters)
+	if err != nil {
+		return "", err
+	}
+
+	ret, err := r.Replace(input, fuzzed, sentinel)
+	if err != nil {
+		return "", err
+	}
+
+	return ret, nil
 }
