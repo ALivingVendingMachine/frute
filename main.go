@@ -6,12 +6,24 @@ import (
 	"log"
 	"os"
 
+	"github.com/alivingvendingmachine/frute/art"
 	"github.com/alivingvendingmachine/frute/util"
 	"github.com/kortschak/ct"
 )
 
 //f "github.com/alivingvendingmachine/frute/fuzzer"
 //r "github.crm/alivingvendingmachine/frute/replacer"
+
+type headerFlags []string
+
+func (h *headerFlags) String() string {
+	return ""
+}
+
+func (h *headerFlags) Set(value string) error {
+	*h = append(*h, value)
+	return nil
+}
 
 var (
 	//traceLog *log.Logger
@@ -28,14 +40,17 @@ var (
 	urlFlag    string
 	methodFlag string
 	bodyFlag   string
+	headers    headerFlags
 )
 
 func printUsage() {
-	fmt.Println("usage: frute [-h] [--url url [--method method [--body body]]] request_output_file")
+	fmt.Println("usage:")
+	fmt.Println("\tfrute [-h] [--url url [--method method [--body body] [-header header_pair]]] request_output_file\n")
 	fmt.Println("\t-h --help\n\tprint this usage message, then quit\n")
 	fmt.Println("\t-u --url\n\tspecified url to use while generating a new request text file")
 	fmt.Println("\t-m --method\n\tthe method to use on the new request")
 	fmt.Println("\t-b --body\n\tthe body of the request to use")
+	fmt.Println("\t-H --header\n\theaders to include while generating a request")
 }
 
 func init() {
@@ -50,6 +65,7 @@ func init() {
 		urlUsage    = "url to generate a request to"
 		methodUsage = "method to use while generating request"
 		bodyUsage   = "request body to use while generating request"
+		headerUsage = "headers to include while generating request"
 	)
 	flag.BoolVar(&helpFlag, "h", false, helpUsage+" (shorthand)")
 	flag.BoolVar(&helpFlag, "help", false, helpUsage)
@@ -62,10 +78,14 @@ func init() {
 
 	flag.StringVar(&bodyFlag, "b", "", bodyUsage+" (shorthand)")
 	flag.StringVar(&bodyFlag, "body", "", bodyUsage)
+
+	flag.Var(&headers, "H", headerUsage+" (shorthand)")
+	flag.Var(&headers, "header", headerUsage)
 }
 
 func main() {
 	flag.Parse()
+	art.DrawArt()
 
 	if helpFlag {
 		flag.Usage()
@@ -92,7 +112,7 @@ func main() {
 
 	if urlFlag != "" {
 		infoLog.Println("generating request")
-		err := util.GenerateRequest(methodFlag, urlFlag, bodyFlag, flag.Args()[0])
+		err := util.GenerateRequest(methodFlag, urlFlag, bodyFlag, headers, flag.Args()[0])
 		if err != nil {
 			errorLog.Printf("%v\n", err)
 		}

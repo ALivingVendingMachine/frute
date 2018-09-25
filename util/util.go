@@ -9,7 +9,7 @@ import (
 )
 
 // GenerateRequest takes
-func GenerateRequest(method string, url string, body string, filename string) error {
+func GenerateRequest(method string, url string, body string, headerFlags []string, filename string) error {
 	method = strings.ToUpper(method)
 	if method != "GET" &&
 		method != "HEAD" &&
@@ -25,6 +25,15 @@ func GenerateRequest(method string, url string, body string, filename string) er
 	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		return err
+	}
+
+	for _, header := range headerFlags {
+		h := strings.Split(header, ":")
+		if h[1][0] == ' ' {
+			req.Header.Add(h[0], h[1][1:])
+		} else {
+			req.Header.Add(h[0], h[1])
+		}
 	}
 
 	dump, err := httputil.DumpRequestOut(req, true)

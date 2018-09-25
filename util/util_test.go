@@ -8,7 +8,7 @@ import (
 )
 
 func TestGenerateRequest(t *testing.T) {
-	err := u.GenerateRequest("GET", "http://www.google.com", "", "test.out")
+	err := u.GenerateRequest("GET", "http://www.google.com", "", nil, "test.out")
 	if err != nil {
 		t.Errorf("error: %v", err)
 	}
@@ -19,12 +19,12 @@ func TestGenerateRequest(t *testing.T) {
 }
 
 func TestGenerateRequestErrors(t *testing.T) {
-	err := u.GenerateRequest("NO", "http://www.google.com", "", "test.out")
+	err := u.GenerateRequest("NO", "http://www.google.com", "", nil, "test.out")
 	if err == nil {
 		t.Error("expected error, got nothing")
 	}
 
-	err = u.GenerateRequest("post", "www.google.com", "", "test.out")
+	err = u.GenerateRequest("post", "www.google.com", "", nil, "test.out")
 	if err == nil {
 		t.Error("expected error, got nothing")
 	}
