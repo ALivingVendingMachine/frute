@@ -8,7 +8,9 @@ import (
 	"strings"
 )
 
-// GenerateRequest takes
+// GenerateRequest takes a method, url, body, a list of headers, and a filepath,
+// all strings.  It then generates a request for the given url and method, with
+// the given body, and writes it out to the given filepath.
 func GenerateRequest(method string, url string, body string, headerFlags []string, filename string) error {
 	method = strings.ToUpper(method)
 	if method != "GET" &&

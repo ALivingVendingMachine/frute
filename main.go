@@ -45,12 +45,17 @@ var (
 
 func printUsage() {
 	fmt.Println("usage:")
-	fmt.Println("\tfrute [-h] [--url url [--method method [--body body] [-header header_pair]]] request_output_file\n")
-	fmt.Println("\t-h --help\n\tprint this usage message, then quit\n")
-	fmt.Println("\t-u --url\n\tspecified url to use while generating a new request text file")
-	fmt.Println("\t-m --method\n\tthe method to use on the new request")
-	fmt.Println("\t-b --body\n\tthe body of the request to use")
-	fmt.Println("\t-H --header\n\theaders to include while generating a request")
+	fmt.Println("  \tfrute [-h] [--url url --method method [--body body] [-header header_pair]] request_output_file")
+	fmt.Println("or\tfrute -r request_file ...")
+	fmt.Printf("\n")
+	fmt.Println("\t-h --help\n\t  print this usage message, then quit")
+	fmt.Printf("\n")
+	fmt.Println("\t-u --url\n\t  specified url to use while generating a new request text file")
+	fmt.Println("\t-m --method\n\t  the method to use on the new request")
+	fmt.Println("\t-b --body\n\t  the body of the request to use")
+	fmt.Println("\t-H --header\n\t  headers to include while generating a request")
+	fmt.Printf("\n")
+	fmt.Println("\t-r\n\t  specify path to text file which contains a request to send")
 }
 
 func init() {
@@ -97,12 +102,12 @@ func main() {
 		os.Exit(0)
 	}
 	if urlFlag != "" && methodFlag == "" {
-		errorLog.Println("method cannot be blank!\n")
+		errorLog.Println("method cannot be blank!")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if urlFlag != "" && len(flag.Args()) == 0 {
-		errorLog.Println("no output file for request\n")
+		errorLog.Println("no output file for request")
 		flag.Usage()
 		os.Exit(1)
 	}
