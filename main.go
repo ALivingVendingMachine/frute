@@ -123,4 +123,11 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
+	//	client := http.Client{}
+	//	resp, err := client.Do(req)
+	//	if err != nil {
+	//		c <- nil
+	//		return err
+	//	}
 }
