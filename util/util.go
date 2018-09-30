@@ -2,6 +2,7 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -55,4 +56,24 @@ func GenerateRequest(method string, url string, body string, headerFlags []strin
 	}
 
 	return nil
+}
+
+// BulkOpen takes a slice of strings of filenames, and returns a slice of
+// file handlers to the caller.
+func BulkOpen(infiles []string) ([]*os.File, error) {
+	ret := make([]*os.File, len(infiles))
+
+	for i := 0; i < len(infiles); i++ {
+		if infiles[i] != "" {
+			fp, err := os.Open(infiles[i])
+			if err != nil {
+				return nil, fmt.Errorf("error opening file %d", i)
+			}
+			ret[i] = fp
+		} else {
+			ret[i] = nil
+		}
+	}
+
+	return ret, nil
 }
