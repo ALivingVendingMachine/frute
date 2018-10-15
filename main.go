@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/alivingvendingmachine/frute/brute"
+
 	"github.com/alivingvendingmachine/frute/art"
 	"github.com/alivingvendingmachine/frute/fuzzer"
 	"github.com/alivingvendingmachine/frute/requester"
@@ -19,6 +21,7 @@ import (
 )
 
 //TODO: if fuzzing and you have the same sentinel twice, something bad happens
+//TODO: if the sentinels are out of order, boom
 
 type headerFlags []string
 
@@ -47,6 +50,7 @@ var (
 	asciiFlag    bool
 	generateFlag bool
 	itersFlag    int
+	timesFlag    int
 	seedFlag     int64
 	urlFlag      string
 	methodFlag   string
@@ -59,7 +63,7 @@ var (
 func printUsage() {
 	fmt.Println("usage:")
 	fmt.Println("  \tfrute [-h] [--url url --method method [--body body] [-header header_pair]] request_output_file")
-	fmt.Println("or\tfrute -r request_file -s sentinel_file -f")
+	fmt.Println("or\tfrute -f -r request_file [-s sentinel_file] [-times number_of_times")
 	fmt.Printf("\n")
 	fmt.Println("\t-h --help\n\t  print this usage message, then quit")
 	fmt.Printf("\n")
@@ -71,6 +75,7 @@ func printUsage() {
 	fmt.Println("\t-r --request\n\t  specify path to text file which contains a request to send")
 	fmt.Println("\t-s --sentinel\n\t  specify path to text file which contains a list of sentinels to replace while bruting/fuzzing")
 	fmt.Println("\t-f\n\t  fuzz string at sentinels")
+	fmt.Println("\t-times\n\t  times to repeat the fuzzing and sending")
 }
 
 func init() {
@@ -93,6 +98,7 @@ func init() {
 		asciiUsage    = "limit fuzzer to ascii only"
 		itersUsage    = "number of iterations for the fuzzer to use"
 		seedUsage     = "seed to pass to fuzzer, default is current time"
+		timesUsage    = "number of times to repeat the fuzzing and sending"
 	)
 	flag.BoolVar(&helpFlag, "h", false, helpUsage+" (shorthand)")
 	flag.BoolVar(&helpFlag, "help", false, helpUsage)
@@ -120,6 +126,7 @@ func init() {
 	flag.BoolVar(&generateFlag, "G", false, generateUsage)
 
 	flag.IntVar(&itersFlag, "I", 3, itersUsage)
+	flag.IntVar(&timesFlag, "times", 1, timesUsage)
 	flag.Int64Var(&seedFlag, "S", 1234567890, seedUsage)
 }
 
@@ -128,6 +135,7 @@ func main() {
 	art.DrawArt()
 
 	var sents []string
+	newSeed := false
 	//found := false
 
 	if helpFlag {
@@ -167,14 +175,13 @@ func main() {
 
 	// brute/fuzz
 	var ret string
-	var request *http.Request
 	if requestFlag == "" {
 		errorLog.Println("request path not set")
 		os.Exit(1)
 	}
 	if sentsFlag == "" {
 		warnLog.Println("sentinel path not set, using defaults")
-		sents = []string{"!!!", "@@@", "###", "$$$", "^^^", "&&&", "***", "(((", ")))", "___"}
+		sents = []string{"~~~", "!!!", "@@@", "###", "&&&", "<<<", ">>>", "___", ",,,", "'''"}
 	} else if sentsFlag != "" {
 		var err error
 		sents, err = readSents(sentsFlag)
@@ -183,10 +190,15 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	if timesFlag < 1 {
+		errorLog.Println("times to fuzz cannot be less than 1")
+		printUsage()
+	}
 
 	if fuzzFlag { // fuzzing!
-		if seedFlag == 123456790 {
+		if seedFlag == 1234567890 {
 			seedFlag = time.Now().UTC().UnixNano()
+			newSeed = true
 		}
 		if asciiFlag {
 			errorLog.Println("not implemented")
@@ -197,6 +209,38 @@ func main() {
 			os.Exit(1)
 		}
 
+		// loop here
+		for i := 0; i < timesFlag; i++ {
+			req, err := ioutil.ReadFile(requestFlag)
+			if err != nil {
+				errorLog.Printf("%v\n", err)
+				os.Exit(1)
+			}
+
+			ret = string(req)
+			for i := 0; i < len(sents); i++ {
+				var err error
+				thisRet, err := fuzzer.MutateSelection(ret, sents[i], seedFlag, itersFlag)
+				if err != nil {
+					break
+				}
+				ret = thisRet
+			}
+			resp, err := doRequest(ret)
+			if err != nil {
+				errorLog.Printf("%v\n", err)
+			}
+			dump, err := httputil.DumpResponse(resp, true)
+			if err != nil {
+				errorLog.Printf("%v\n", err)
+			}
+			if newSeed {
+				seedFlag = time.Now().UTC().UnixNano()
+			}
+			fmt.Printf("%s\n", dump)
+			// end loop
+		}
+	} else { //bruting
 		req, err := ioutil.ReadFile(requestFlag)
 		if err != nil {
 			errorLog.Printf("%v\n", err)
@@ -204,32 +248,49 @@ func main() {
 		}
 
 		ret = string(req)
-		for i := 0; i < len(sents); i++ {
-			var err error
-			thisRet, err := fuzzer.MutateSelection(ret, sents[i], seedFlag, itersFlag)
-			if err != nil {
-				break
-			}
-			ret = thisRet
-		}
-		request, err = requester.ReadStringReq(ret)
+
+		offs := make([]int64, len(flag.Args()))
+		fps, err := util.BulkOpen(flag.Args())
 		if err != nil {
-			errorLog.Printf("%v\n", err)
+			errorLog.Printf("brute: %v", err)
 			os.Exit(1)
 		}
-	}
 
+		var exhausted = false
+		var out []string
+		out, exhausted, err = util.ReadInputs(fps, offs)
+		for !exhausted {
+			if err != nil {
+				errorLog.Printf("brute: %v", err)
+				os.Exit(1)
+			}
+			ret, err = brute.Forcer(ret, out, sents)
+			fmt.Println("doing:")
+			fmt.Println(ret)
+			resp, err := doRequest(ret)
+			if err != nil {
+				errorLog.Printf("%v", err)
+				os.Exit(1)
+			}
+			dump, err := httputil.DumpResponse(resp, true)
+			if err != nil {
+				errorLog.Printf("%v", err)
+				os.Exit(1)
+			}
+			fmt.Printf("%s\n", dump)
+			out, exhausted, err = util.ReadInputs(fps, offs)
+		}
+	}
+}
+
+func doRequest(request string) (*http.Response, error) {
+	req, err := requester.ReadStringReq(request)
+	if err != nil {
+		return nil, err
+	}
 	client := http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		errorLog.Printf("%v\n", err)
-		os.Exit(1)
-	}
-	dump, err := httputil.DumpResponse(resp, true)
-	if err != nil {
-		errorLog.Printf("%v\n", err)
-	}
-	fmt.Printf("%q\n", dump)
+	resp, err := client.Do(req)
+	return resp, err
 }
 
 func readSents(filepath string) ([]string, error) {
