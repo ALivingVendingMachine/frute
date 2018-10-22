@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"time"
 
 	"github.com/alivingvendingmachine/frute/brute"
+	"github.com/alivingvendingmachine/frute/decoder"
 
 	"github.com/alivingvendingmachine/frute/art"
 	"github.com/alivingvendingmachine/frute/fuzzer"
@@ -45,25 +47,31 @@ var (
 	warnColor  = ct.Fg(ct.Yellow).Paint
 	errorColor = ct.Fg(ct.Red).Paint
 
-	helpFlag     bool
-	fuzzFlag     bool
-	asciiFlag    bool
-	generateFlag bool
-	itersFlag    int
-	timesFlag    int
-	seedFlag     int64
-	urlFlag      string
-	methodFlag   string
-	bodyFlag     string
-	requestFlag  string
-	sentsFlag    string
-	headers      headerFlags
+	helpFlag        bool
+	fuzzFlag        bool
+	asciiFlag       bool
+	generateFlag    bool
+	randomWaitFlag  bool
+	randomWaitRange int
+	itersFlag       int
+	timesFlag       int
+	threadsFlag     int
+	seedFlag        int64
+	waitFlag        time.Duration
+	urlFlag         string
+	methodFlag      string
+	bodyFlag        string
+	requestFlag     string
+	sentsFlag       string
+
+	headers headerFlags
 )
 
 func printUsage() {
 	fmt.Println("usage:")
 	fmt.Println("  \tfrute [-h] [--url url --method method [--body body] [-header header_pair]] request_output_file")
 	fmt.Println("or\tfrute -f -r request_file [-s sentinel_file] [-times number_of_times")
+	fmt.Println("or\tfrute -r request_file [-s sentinel_file] [-R random_wait] [-RT random_time_range] [-W wait time] [-T threads]")
 	fmt.Printf("\n")
 	fmt.Println("\t-h --help\n\t  print this usage message, then quit")
 	fmt.Printf("\n")
@@ -76,6 +84,12 @@ func printUsage() {
 	fmt.Println("\t-s --sentinel\n\t  specify path to text file which contains a list of sentinels to replace while bruting/fuzzing")
 	fmt.Println("\t-f\n\t  fuzz string at sentinels")
 	fmt.Println("\t-times\n\t  times to repeat the fuzzing and sending")
+	fmt.Printf("\n")
+	fmt.Println("\t-r --request\n\t  specify path to text file which contains a request to send")
+	fmt.Println("\t-R --random-wait\n\t  wait a random fraction of a second")
+	fmt.Println("\t-RT --random-wait-range\n\t  define a scalar for the random wait time (ie randomWaitTime * range)")
+	fmt.Println("\t-W --wait\n\t  set a static time to wait")
+	fmt.Println("\t-T\n\t  number of threads (requests in air at any time) (10 by default)")
 }
 
 func init() {
@@ -86,19 +100,23 @@ func init() {
 	errorLog = log.New(os.Stderr, fmt.Sprint(errorColor("ERROR: ")), log.Ldate|log.Ltime)
 
 	const (
-		helpUsage     = "prints usage, then exits"
-		urlUsage      = "url to generate a request to"
-		methodUsage   = "method to use while generating request"
-		bodyUsage     = "request body to use while generating request"
-		headerUsage   = "headers to include while generating request"
-		requestUsage  = "request to use while fuzzing/bruteforcing"
-		sentsUsage    = "filepath to file containing sentinels"
-		fuzzUsage     = "set to fuzzing"
-		generateUsage = "let fuzzer generate new strings at sentinels"
-		asciiUsage    = "limit fuzzer to ascii only"
-		itersUsage    = "number of iterations for the fuzzer to use"
-		seedUsage     = "seed to pass to fuzzer, default is current time"
-		timesUsage    = "number of times to repeat the fuzzing and sending"
+		helpUsage            = "prints usage, then exits"
+		urlUsage             = "url to generate a request to"
+		methodUsage          = "method to use while generating request"
+		bodyUsage            = "request body to use while generating request"
+		headerUsage          = "headers to include while generating request"
+		requestUsage         = "request to use while fuzzing/bruteforcing"
+		sentsUsage           = "filepath to file containing sentinels"
+		fuzzUsage            = "set to fuzzing"
+		generateUsage        = "let fuzzer generate new strings at sentinels"
+		asciiUsage           = "limit fuzzer to ascii only"
+		itersUsage           = "number of iterations for the fuzzer to use"
+		seedUsage            = "seed to pass to fuzzer, default is current time"
+		timesUsage           = "number of times to repeat the fuzzing and sending"
+		waitUsage            = "time to wait"
+		randomWaitUsage      = "wait a random amount of time between requests"
+		randomWaitRangeUsage = "scalar for the random wait time"
+		threadsUsage         = "number of threads to use (number of requests at any given time"
 	)
 	flag.BoolVar(&helpFlag, "h", false, helpUsage+" (shorthand)")
 	flag.BoolVar(&helpFlag, "help", false, helpUsage)
@@ -125,8 +143,18 @@ func init() {
 	flag.BoolVar(&asciiFlag, "A", false, asciiUsage)
 	flag.BoolVar(&generateFlag, "G", false, generateUsage)
 
+	flag.DurationVar(&waitFlag, "W", 0, waitUsage)
+	flag.DurationVar(&waitFlag, "wait", 0, waitUsage)
+
+	flag.BoolVar(&randomWaitFlag, "R", false, randomWaitUsage)
+	flag.BoolVar(&randomWaitFlag, "random-wait", false, randomWaitUsage)
+
+	flag.IntVar(&randomWaitRange, "RT", 1, randomWaitRangeUsage)
+	flag.IntVar(&randomWaitRange, "random-wait-range", 1, randomWaitRangeUsage)
+
 	flag.IntVar(&itersFlag, "I", 3, itersUsage)
 	flag.IntVar(&timesFlag, "times", 1, timesUsage)
+	flag.IntVar(&threadsFlag, "T", 10, threadsUsage)
 	flag.Int64Var(&seedFlag, "S", 1234567890, seedUsage)
 }
 
@@ -194,6 +222,9 @@ func main() {
 		errorLog.Println("times to fuzz cannot be less than 1")
 		printUsage()
 	}
+	if randomWaitFlag == false && randomWaitRange != 1 {
+		randomWaitFlag = true
+	}
 
 	if fuzzFlag { // fuzzing!
 		if seedFlag == 1234567890 {
@@ -260,24 +291,34 @@ func main() {
 		var out []string
 		out, exhausted, err = util.ReadInputs(fps, offs)
 		for !exhausted {
+			if randomWaitFlag {
+				time.Sleep(time.Duration(rand.Intn(100)/100) * time.Second)
+			}
+			if waitFlag != time.Duration(0) {
+				time.Sleep(waitFlag)
+			}
 			if err != nil {
 				errorLog.Printf("brute: %v", err)
 				os.Exit(1)
 			}
-			ret, err = brute.Forcer(ret, out, sents)
-			fmt.Println("doing:")
-			fmt.Println(ret)
-			resp, err := doRequest(ret)
+			do, err := brute.Forcer(ret, out, sents)
+			resp, err := doRequest(do)
 			if err != nil {
 				errorLog.Printf("%v", err)
 				os.Exit(1)
 			}
-			dump, err := httputil.DumpResponse(resp, true)
+			dump, err := httputil.DumpResponse(resp, false)
 			if err != nil {
-				errorLog.Printf("%v", err)
+				errorLog.Printf("error dumping response: %v", err)
 				os.Exit(1)
 			}
 			fmt.Printf("%s\n", dump)
+			body, err := decoder.Decode(resp)
+			if err != nil {
+				errorLog.Printf("error decoding body: %v", err)
+				os.Exit(1)
+			}
+			fmt.Printf("%s\n", body)
 			out, exhausted, err = util.ReadInputs(fps, offs)
 		}
 	}
