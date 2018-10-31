@@ -444,3 +444,25 @@ func TestExhaustFile(t *testing.T) {
 		t.Fatalf("error: %v\n", err)
 	}
 }
+
+func TestCountPerms(t *testing.T) {
+	files := []string{
+		"../testfiles/testFile0",
+		"../testfiles/testFile1",
+		"../testfiles/testFile2",
+	}
+
+	fps, err := u.BulkOpen(files)
+	if err != nil {
+		t.Fatalf("error in BulkOpen: %v\n", err)
+	}
+
+	ret, err := u.CountPerms(fps)
+	if err != nil {
+		t.Fatalf("some sort of error in countperms: %v", err)
+	}
+	t.Logf("got %d", ret)
+	if ret != 125 {
+		t.Fatalf("expected 125, got %d", ret)
+	}
+}

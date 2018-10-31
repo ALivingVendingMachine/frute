@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/alivingvendingmachine/frute/brute"
@@ -56,7 +57,6 @@ var (
 	itersFlag       int
 	timesFlag       int
 	threadsFlag     int
-	seedFlag        int64
 	waitFlag        time.Duration
 	urlFlag         string
 	methodFlag      string
@@ -111,7 +111,6 @@ func init() {
 		generateUsage        = "let fuzzer generate new strings at sentinels"
 		asciiUsage           = "limit fuzzer to ascii only"
 		itersUsage           = "number of iterations for the fuzzer to use"
-		seedUsage            = "seed to pass to fuzzer, default is current time"
 		timesUsage           = "number of times to repeat the fuzzing and sending"
 		waitUsage            = "time to wait"
 		randomWaitUsage      = "wait a random amount of time between requests"
@@ -155,7 +154,6 @@ func init() {
 	flag.IntVar(&itersFlag, "I", 3, itersUsage)
 	flag.IntVar(&timesFlag, "times", 1, timesUsage)
 	flag.IntVar(&threadsFlag, "T", 10, threadsUsage)
-	flag.Int64Var(&seedFlag, "S", 1234567890, seedUsage)
 }
 
 func main() {
@@ -163,8 +161,6 @@ func main() {
 	art.DrawArt()
 
 	var sents []string
-	newSeed := false
-	//found := false
 
 	if helpFlag {
 		flag.Usage()
@@ -227,10 +223,6 @@ func main() {
 	}
 
 	if fuzzFlag { // fuzzing!
-		if seedFlag == 1234567890 {
-			seedFlag = time.Now().UTC().UnixNano()
-			newSeed = true
-		}
 		if asciiFlag {
 			errorLog.Println("not implemented")
 			os.Exit(1)
@@ -240,37 +232,85 @@ func main() {
 			os.Exit(1)
 		}
 
-		// loop here
-		for i := 0; i < timesFlag; i++ {
-			req, err := ioutil.ReadFile(requestFlag)
-			if err != nil {
-				errorLog.Printf("%v\n", err)
-				os.Exit(1)
-			}
+		times := 0
+		remainder := 0
+		responses := make(chan *http.Response, timesFlag)
+		donePrinting := make(chan struct{})
+		var wg sync.WaitGroup
 
-			ret = string(req)
-			for i := 0; i < len(sents); i++ {
-				var err error
-				thisRet, err := fuzzer.MutateSelection(ret, sents[i], seedFlag, itersFlag)
-				if err != nil {
-					break
-				}
-				ret = thisRet
-			}
-			resp, err := doRequest(ret)
-			if err != nil {
-				errorLog.Printf("%v\n", err)
-			}
-			dump, err := httputil.DumpResponse(resp, true)
-			if err != nil {
-				errorLog.Printf("%v\n", err)
-			}
-			if newSeed {
-				seedFlag = time.Now().UTC().UnixNano()
-			}
-			fmt.Printf("%s\n", dump)
-			// end loop
+		go printLoop(timesFlag, responses, donePrinting)
+
+		req, err := ioutil.ReadFile(requestFlag)
+		if err != nil {
+			errorLog.Printf("%v\n", err)
+			os.Exit(1)
 		}
+
+		ret = string(req)
+		// times is the number of times to do threadsFlag threads, and the remainder
+		// is the number of remaining threads to do
+		if timesFlag == threadsFlag {
+			times = timesFlag
+		} else if timesFlag > threadsFlag {
+			times = int(timesFlag / threadsFlag)
+			remainder = int(timesFlag % threadsFlag)
+		} else {
+			remainder = timesFlag
+		}
+
+		for i := 0; i < times; i++ {
+			for j := 0; j < threadsFlag; j++ {
+				go func(request string) {
+					seed := time.Now().UTC().UnixNano()
+					infoLog.Printf("leased thread with seed %d\n", seed)
+					wg.Add(1)
+					for i := 0; i < len(sents); i++ {
+						var err error
+						thisRet, err := fuzzer.MutateSelection(request, sents[i], seed, itersFlag)
+						if err != nil {
+							break
+						}
+						request = thisRet
+					}
+					resp, err := doRequest(request)
+					if err != nil {
+						errorLog.Printf("%v\n", err)
+						responses <- nil
+					}
+					responses <- resp
+					wg.Done()
+				}(ret)
+			}
+			infoLog.Printf("leased %d routines, waiting for them to return", threadsFlag)
+			wg.Wait()
+		}
+
+		for i := 0; i < remainder; i++ {
+			go func(request string) {
+				seed := time.Now().UTC().UnixNano()
+				infoLog.Printf("leased thread with seed %d\n", seed)
+				wg.Add(1)
+				for i := 0; i < len(sents); i++ {
+					var err error
+					thisRet, err := fuzzer.MutateSelection(request, sents[i], seed, itersFlag)
+					if err != nil {
+						break
+					}
+					request = thisRet
+				}
+				resp, err := doRequest(request)
+				if err != nil {
+					errorLog.Printf("%v\n", err)
+					responses <- nil
+				}
+				responses <- resp
+				wg.Done()
+			}(ret)
+		}
+
+		infoLog.Println("waiting for printing to finish")
+		<-donePrinting
+		infoLog.Println("shutting down")
 	} else { //bruting
 		req, err := ioutil.ReadFile(requestFlag)
 		if err != nil {
@@ -287,40 +327,70 @@ func main() {
 			os.Exit(1)
 		}
 
-		var exhausted = false
-		var out []string
-		out, exhausted, err = util.ReadInputs(fps, offs)
-		for !exhausted {
-			if randomWaitFlag {
-				time.Sleep(time.Duration(rand.Intn(100)/100) * time.Second)
-			}
-			if waitFlag != time.Duration(0) {
-				time.Sleep(waitFlag)
-			}
-			if err != nil {
-				errorLog.Printf("brute: %v", err)
-				os.Exit(1)
-			}
-			do, err := brute.Forcer(ret, out, sents)
-			resp, err := doRequest(do)
-			if err != nil {
-				errorLog.Printf("%v", err)
-				os.Exit(1)
-			}
-			dump, err := httputil.DumpResponse(resp, false)
-			if err != nil {
-				errorLog.Printf("error dumping response: %v", err)
-				os.Exit(1)
-			}
-			fmt.Printf("%s\n", dump)
-			body, err := decoder.Decode(resp)
-			if err != nil {
-				errorLog.Printf("error decoding body: %v", err)
-				os.Exit(1)
-			}
-			fmt.Printf("%s\n", body)
-			out, exhausted, err = util.ReadInputs(fps, offs)
+		count, err := util.CountPerms(fps)
+		if count == 0 {
+			errorLog.Println("found an empty file?")
+			printUsage()
+			os.Exit(1)
 		}
+		if err != nil {
+			errorLog.Printf("%v\n", err)
+			os.Exit(1)
+		}
+		perms := make(chan []string, count)
+		responses := make(chan *http.Response, count)
+		done := make(chan struct{})
+		donePrinting := make(chan struct{})
+		var wg sync.WaitGroup
+
+		go fillPerms(perms, fps, offs, done)
+		go printLoop(count, responses, donePrinting)
+
+		// wait until the perms channel is filled
+		<-done
+		for len(perms) != 0 { // while there's still info to read from perms
+			for i := 0; i < threadsFlag; i++ { // lease threadsFlag threads
+				go func() { //each of those threads do this
+					// add one to the waitgroup
+					wg.Add(1)
+					//check to see if we're going to sleep before we send
+					if randomWaitFlag {
+						scale := rand.Intn(100) / 100
+						infoLog.Printf("Sleeping for %d seconds\n", scale)
+						time.Sleep(time.Duration(time.Duration(scale) * time.Second))
+					}
+					if waitFlag != time.Duration(0) {
+						time.Sleep(waitFlag)
+					}
+					// get a permutation from the channel
+					bruteThis, ok := <-perms
+					if ok { // if we were able to read one
+						// call the brute forcer to get the new request
+						do, err := brute.Forcer(ret, bruteThis, sents)
+						if err != nil {
+							errorLog.Printf("%v", err)
+						}
+						// go and do that response (this is SLOW)
+						resp, err := doRequest(do)
+						if err != nil { // if we can't do the response
+							errorLog.Printf("%v", err)
+							// we need to give the printer channel SOMETHING
+							responses <- nil
+						} else { // give this to the printer channel
+							responses <- resp
+						}
+					}
+					// mark this thread done
+					wg.Done()
+				}()
+			}
+			// main waits here for all those threads to return
+			infoLog.Printf("leased %d routines, waiting for them to return", threadsFlag)
+			wg.Wait()
+		}
+		// main waits here until there's nothing more to print
+		<-donePrinting
+		infoLog.Println("shutting down")
 	}
 }
 
@@ -348,4 +418,42 @@ func readSents(filepath string) ([]string, error) {
 	}
 
 	return ret, scanner.Err()
+}
+
+func fillPerms(perms chan []string, fps []*os.File, offs []int64, done chan struct{}) {
+	var exhausted = false
+	var out []string
+	var err error
+	out, exhausted, err = util.ReadInputs(fps, offs)
+	for !exhausted {
+		if err != nil {
+			return
+		}
+		perms <- out
+		out, exhausted, err = util.ReadInputs(fps, offs)
+	}
+	close(perms)
+	close(done)
+}
+
+func printLoop(n int, printChan chan *http.Response, doneChan chan struct{}) {
+	for i := 0; i < n; i++ {
+		m, ok := <-printChan
+		if ok {
+			if m != nil {
+				resStr, err := decoder.Decode(m)
+				if err != nil {
+					errorLog.Println("error decoding response")
+				}
+				dump, err := httputil.DumpResponse(m, false)
+				if err != nil {
+					errorLog.Printf("error dumping response header: %v", err)
+				}
+				fmt.Printf("%s", dump)
+
+				fmt.Printf("%s\n", resStr)
+			}
+		}
+	}
+	close(doneChan)
 }
