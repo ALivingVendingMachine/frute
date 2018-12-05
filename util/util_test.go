@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	u "github.com/alivingvendingmachine/frute/util"
+	u "github.com/ALivingVendingMachine/frute/util"
 )
 
 func TestGenerateRequest(t *testing.T) {

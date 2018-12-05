@@ -1,7 +1,7 @@
 package brute
 
 import (
-	"github.com/alivingvendingmachine/frute/replacer"
+	"github.com/ALivingVendingMachine/frute/replacer"
 )
 
 // Forcer takes an input, an array of replacements, and an array of sentinels.

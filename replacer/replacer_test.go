@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	r "github.com/alivingvendingmachine/frute/replacer"
+	r "github.com/ALivingVendingMachine/frute/replacer"
 )
 
 func TestSearch(t *testing.T) {

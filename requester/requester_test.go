@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	r "github.com/alivingvendingmachine/frute/requester"
+	r "github.com/ALivingVendingMachine/frute/requester"
 )
 
 func TestRequest(t *testing.T) {

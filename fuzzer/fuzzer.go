@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"strings"
 
-	r "github.com/alivingvendingmachine/frute/replacer"
+	r "github.com/ALivingVendingMachine/frute/replacer"
 )
 
 // MutateString takes a string and a seed for a random number generator.  Then,

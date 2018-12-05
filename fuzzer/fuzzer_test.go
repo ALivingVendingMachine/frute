@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	f "github.com/alivingvendingmachine/frute/fuzzer"
+	f "github.com/ALivingVendingMachine/frute/fuzzer"
 )
 
 func TestMutateString(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alivingvendingmachine/frute/brute"
+	"github.com/ALivingVendingMachine/frute/brute"
 )
 
 func TestBruteForce(t *testing.T) {

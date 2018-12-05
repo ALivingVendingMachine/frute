@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alivingvendingmachine/frute/brute"
-	"github.com/alivingvendingmachine/frute/decoder"
+	"github.com/ALivingVendingMachine/frute/brute"
+	"github.com/ALivingVendingMachine/frute/decoder"
 
-	"github.com/alivingvendingmachine/frute/art"
-	"github.com/alivingvendingmachine/frute/fuzzer"
-	"github.com/alivingvendingmachine/frute/requester"
-	"github.com/alivingvendingmachine/frute/util"
+	"github.com/ALivingVendingMachine/frute/art"
+	"github.com/ALivingVendingMachine/frute/fuzzer"
+	"github.com/ALivingVendingMachine/frute/requester"
+	"github.com/ALivingVendingMachine/frute/util"
 	"github.com/kortschak/ct"
 )
 
