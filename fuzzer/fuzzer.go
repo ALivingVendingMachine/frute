@@ -141,25 +141,25 @@ func RandomInt(limit int, seed int64) (int, error) {
 // MutateSelection takes an input, sentinel (both strings), a seed (int64), and
 // a number of iterations.  It then mutates the string, and returns the input
 // with the selection (between sentinels) mutated.
-func MutateSelection(input string, sentinel string, seed int64, iters int) (string, error) {
+func MutateSelection(input string, sentinel string, seed int64, iters int) (string, string, error) {
 	start, stop, err := r.Search(input, sentinel)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	fuzz := input[start+(len(sentinel)) : stop-(len(sentinel))]
 
 	fuzzed, err := MutateString(fuzz, seed, iters)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	ret, err := r.Replace(input, fuzzed, sentinel)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return ret, nil
+	return ret, fuzzed, nil
 }
 
 // MutateSelectionASCII takes an input, sentinel (both strings), a seed (int64), and

@@ -37,6 +37,11 @@ func (h *headerFlags) Set(value string) error {
 	return nil
 }
 
+type respAndStrings struct {
+	resp    *http.Response
+	strings []string
+}
+
 var (
 	//traceLog *log.Logger
 	infoLog  *log.Logger
@@ -84,6 +89,7 @@ func printUsage() {
 	fmt.Println("\t-s --sentinel\n\t  specify path to text file which contains a list of sentinels to replace while bruting/fuzzing")
 	fmt.Println("\t-f\n\t  fuzz string at sentinels")
 	fmt.Println("\t-times\n\t  times to repeat the fuzzing and sending")
+	fmt.Println("\t-I\n\t  iterations for the fuzzer to use")
 	fmt.Printf("\n")
 	fmt.Println("\t-r --request\n\t  specify path to text file which contains a request to send")
 	fmt.Println("\t-R --random-wait\n\t  wait a random fraction of a second")
@@ -234,7 +240,7 @@ func main() {
 
 		times := 0
 		remainder := 0
-		responses := make(chan *http.Response, timesFlag)
+		responses := make(chan *respAndStrings, timesFlag)
 		donePrinting := make(chan struct{})
 		var wg sync.WaitGroup
 
@@ -261,15 +267,17 @@ func main() {
 		for i := 0; i < times; i++ {
 			for j := 0; j < threadsFlag; j++ {
 				go func(request string) {
+					wg.Add(1)
 					seed := time.Now().UTC().UnixNano()
 					infoLog.Printf("leased thread with seed %d\n", seed)
-					wg.Add(1)
+					var fuzzed []string
 					for i := 0; i < len(sents); i++ {
 						var err error
-						thisRet, err := fuzzer.MutateSelection(request, sents[i], seed, itersFlag)
+						thisRet, fuzz, err := fuzzer.MutateSelection(request, sents[i], seed, itersFlag)
 						if err != nil {
 							break
 						}
+						fuzzed = append(fuzzed, fuzz)
 						request = thisRet
 					}
 					resp, err := doRequest(request)
@@ -277,7 +285,8 @@ func main() {
 						errorLog.Printf("%v\n", err)
 						responses <- nil
 					}
-					responses <- resp
+					ret := respAndStrings{resp: resp, strings: fuzzed}
+					responses <- &ret
 					wg.Done()
 				}(ret)
 			}
@@ -287,15 +296,17 @@ func main() {
 
 		for i := 0; i < remainder; i++ {
 			go func(request string) {
+				wg.Add(1)
 				seed := time.Now().UTC().UnixNano()
 				infoLog.Printf("leased thread with seed %d\n", seed)
-				wg.Add(1)
+				var fuzzed []string
 				for i := 0; i < len(sents); i++ {
 					var err error
-					thisRet, err := fuzzer.MutateSelection(request, sents[i], seed, itersFlag)
+					thisRet, fuzz, err := fuzzer.MutateSelection(request, sents[i], seed, itersFlag)
 					if err != nil {
 						break
 					}
+					fuzzed = append(fuzzed, fuzz)
 					request = thisRet
 				}
 				resp, err := doRequest(request)
@@ -303,7 +314,8 @@ func main() {
 					errorLog.Printf("%v\n", err)
 					responses <- nil
 				}
-				responses <- resp
+				ret := respAndStrings{resp: resp, strings: fuzzed}
+				responses <- &ret
 				wg.Done()
 			}(ret)
 		}
@@ -338,7 +350,7 @@ func main() {
 			os.Exit(1)
 		}
 		perms := make(chan []string, count)
-		responses := make(chan *http.Response, count)
+		responses := make(chan *respAndStrings, count)
 		done := make(chan struct{})
 		donePrinting := make(chan struct{})
 		var wg sync.WaitGroup
@@ -368,6 +380,7 @@ func main() {
 						// call the brute forcer to get the new request
 						do, err := brute.Forcer(ret, bruteThis, sents)
 						if err != nil {
+							responses <- nil
 							errorLog.Printf("%v", err)
 						}
 						// go and do that response (this is SLOW)
@@ -377,7 +390,8 @@ func main() {
 							// we need to give the printer channel SOMETHING
 							responses <- nil
 						} else { // give this to the printer channel
-							responses <- resp
+							ret := respAndStrings{resp: resp, strings: bruteThis}
+							responses <- &ret
 						}
 					}
 					// mark this thread done
@@ -436,16 +450,19 @@ func fillPerms(perms chan []string, fps []*os.File, offs []int64, done chan stru
 	close(done)
 }
 
-func printLoop(n int, printChan chan *http.Response, doneChan chan struct{}) {
+func printLoop(n int, printChan chan *respAndStrings, doneChan chan struct{}) {
 	for i := 0; i < n; i++ {
 		m, ok := <-printChan
 		if ok {
 			if m != nil {
-				resStr, err := decoder.Decode(m)
+				resStr, err := decoder.Decode(m.resp)
 				if err != nil {
 					errorLog.Println("error decoding response")
 				}
-				dump, err := httputil.DumpResponse(m, false)
+				fmt.Println("#####################################")
+				fmt.Printf("SENT\n%q\nRESPONSE:\n", m.strings)
+				fmt.Println("#####################################")
+				dump, err := httputil.DumpResponse(m.resp, false)
 				if err != nil {
 					errorLog.Printf("error dumping response header: %v", err)
 				}

@@ -264,7 +264,7 @@ func TestMutateSelection(t *testing.T) {
 		{"destroy!!!er!!!!", "!!!", 9876543210, 1, "destroyr!"},
 	}
 	for i, test := range tests {
-		out, err := f.MutateSelection(test.input, test.sentinel, test.seed, test.iters)
+		out, _, err := f.MutateSelection(test.input, test.sentinel, test.seed, test.iters)
 		t.Logf("got %q", out)
 		if err != nil {
 			t.Errorf("error: %v", err)
