@@ -1,6 +1,9 @@
 # frute
 an http fuzzer / brute forcer
 
+## install:
+Install go.  Then, `go get github.com/kortschak/ct`.  Then, finally, `go install`.
+
 ## requires:
 
 `go get github.com/kortschak/ct`
@@ -32,7 +35,7 @@ go run main.go -r testfiles/fuzzme2 -f -times 2
       specify path to text file which contains a request to send
     -s --sentinel <sentinel_file>
       specify path to text file which contains a list of sentinels to replace while bruting/fuzzing
-    -f 
+    -f
       fuzz string at sentinels
     -times <number_of_times>
       times to repeat the fuzzing and sending
